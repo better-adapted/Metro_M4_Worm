@@ -1,0 +1,11 @@
+M4_Metro_Worm_P5_VGDB/CodeDB/
+M4_Metro_Worm_P5_VGDB/VisualGDBCache/
+M4_Metro_Worm_P5_VGDB/Output/
+*.o
+*.log
+*.db
+*.suo
+*.ipch
+
+# Visual Studio 2015 cache/options directory
+.vs/

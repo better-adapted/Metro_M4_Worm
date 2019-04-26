@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.539
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{803FD0C6-D64E-4E16-9DC3-1DAEC859A3D2}") = "M4_Metro_Worm_P5_VGDB", "M4_Metro_Worm_P5_VGDB.vgdbproj", "{C1C1CC8C-1EAE-4FE6-8C06-9599C177F5E1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Adafruit_Metro_M4_(SAMD51) = Debug|Adafruit_Metro_M4_(SAMD51)
+		Release|Adafruit_Metro_M4_(SAMD51) = Release|Adafruit_Metro_M4_(SAMD51)
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C1C1CC8C-1EAE-4FE6-8C06-9599C177F5E1}.Debug|Adafruit_Metro_M4_(SAMD51).ActiveCfg = Debug|Adafruit_Metro_M4_(SAMD51)
+		{C1C1CC8C-1EAE-4FE6-8C06-9599C177F5E1}.Debug|Adafruit_Metro_M4_(SAMD51).Build.0 = Debug|Adafruit_Metro_M4_(SAMD51)
+		{C1C1CC8C-1EAE-4FE6-8C06-9599C177F5E1}.Release|Adafruit_Metro_M4_(SAMD51).ActiveCfg = Release|Adafruit_Metro_M4_(SAMD51)
+		{C1C1CC8C-1EAE-4FE6-8C06-9599C177F5E1}.Release|Adafruit_Metro_M4_(SAMD51).Build.0 = Release|Adafruit_Metro_M4_(SAMD51)
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A9047E69-510B-4704-A8D0-3F5A06ACFA12}
+	EndGlobalSection
+EndGlobal
