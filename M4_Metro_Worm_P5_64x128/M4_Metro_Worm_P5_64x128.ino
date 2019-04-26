@@ -46,9 +46,23 @@ typedef struct
 
 static worm_segment WormBody[WORM_MAX_LENGTH];   // 100 parts to worm - as if!! [0] is his head and it fills up
 
+typedef enum {empty,apple,pear,orange}fruit_enum;
+
+#define FRUIT_MAX 10
+typedef struct
+{
+	int x;
+	int y;
+	
+	fruit_enum fruit;
+}fruit_item;
+
+static fruit_item FruitList[FRUIT_MAX];    // 100 parts to worm - as if!! [0] is his head and it fills up
 
 void Worm_Reset();
 void Worm_Draw();
+
+bool Worm_Check_Point_Inside(int x, int y);
 
 void setup()
 {
@@ -84,6 +98,104 @@ void setup()
 	delay(500);
 
 	matrix.fillScreen(matrix.Color333(0, 0, 0));  // 0,0,0 = black
+}
+
+int Fruit_Active()
+{	
+	int counter = 0;
+	
+	// how may bits of fruit active
+	for(int index = 0 ; index < FRUIT_MAX ; index++)
+	{
+		if (FruitList[index].fruit != empty)
+		{
+			counter++;
+		}
+	}
+	
+	return counter;
+}
+
+bool Fruit_New_Piece()
+{	
+	bool done = false;
+	
+	for(int index = 0 ; index < FRUIT_MAX ; index++)
+	{
+		if (FruitList[index].fruit == empty)
+		{
+			int temp_random = (rand() % 3);
+			
+			switch (temp_random)
+			{				
+			case 0:
+				{
+					FruitList[index].fruit = apple;
+				}
+				break;
+
+			case 1:
+				{
+					FruitList[index].fruit = pear;					
+				}
+				break;
+
+			case 2:
+				{
+					FruitList[index].fruit = orange;
+				}
+				break;
+			}
+			
+			// make an new x,y location that is not inside the snake or within 1 pixel...
+			int temp_x, temp_y;
+			
+			while (1)
+			{
+				temp_x = rand() % matrix.width();
+				temp_y = rand() % matrix.height();
+			
+				if (Worm_Check_Point_Inside(temp_x, temp_y) == 0)
+				{
+					FruitList[index].x = temp_x;
+					FruitList[index].y = temp_y;
+					break;
+				}				
+			}
+			
+		}
+	}
+}
+
+
+void Fruit_Service()
+{
+	// every time a peice is eaten a new peice will spawn random 0 to 3 seconds later...
+	
+	// need fruit?
+	int items = Fruit_Active();
+	
+	int max_fruit_level = 5;
+	
+	if (items < max_fruit_level)
+	{						
+		Fruit_New_Piece();
+	}
+	
+}
+
+bool Worm_Check_Point_Inside(int x, int y)
+{
+	int count = 0;
+	
+	for (int index = 0; index < WormLength; index++)
+	{
+		if( (WormBody[index].x == x)&&(WormBody[index].y==y))
+		{
+			count++;			
+		}
+	}	
+	return count;
 }
 
 void Worm_Reset()
@@ -275,7 +387,7 @@ void Worm_Move()
 		break;
 	}
 
-	CheckDead();
+	//CheckDead();
 }
 
 void Worm_Draw()
@@ -292,11 +404,11 @@ void Worm_Draw()
 		{
 			if (index == 0)
 			{
-				matrix.writePixel(WormBody[index].x, WormBody[index].y, matrix.Color333(7, 0, 0));
+				matrix.writePixel(WormBody[index].x, WormBody[index].y, matrix.Color333(0, 0, 7));
 			}
 			else
 			{
-				uint16_t color = 0;
+/*				uint16_t color = 0;
 				switch ((index - 1) % 4)
 				{
 
@@ -313,12 +425,48 @@ void Worm_Draw()
 				case 3:
 					color = matrix.Color333(5, 5, 5);
 					break;
-				}
+				}*/
 				
+				int color = matrix.Color333(1, 1, 1);
 				matrix.writePixel(WormBody[index].x, WormBody[index].y, color);
 			}
-		}
+			
+			// draw the fruit			
+		}						
 	}  
+	
+	for (int index = 0; index < Fruit_Active(); index++)
+	{
+		uint16_t color=0;
+		switch (FruitList[index].fruit)
+		{
+		case apple:
+			{
+				color = matrix.Color333(7, 0, 0);
+			}
+			break;
+			
+		case orange:
+			{
+				color = matrix.Color333(7, 4, 0);
+			}
+			break;
+
+		case pear:
+			{
+				color = matrix.Color333(0, 7, 1);
+			}
+			break;
+
+		default:
+			{
+					
+			}
+			break;
+		}
+		matrix.writePixel(FruitList[index].x, FruitList[index].y, color);
+	}
+	
 
 	if (WormDirection == stopped)
 	{
@@ -420,7 +568,7 @@ void debug_keys()
 }
 
 static long millis_last_move;
-static long millis_last_grow;
+static long millis_last_fruit;
 bool WaitForMove = false;
 bool DrawDead = false;
 
@@ -444,14 +592,11 @@ void loop()
 				WaitForMove = true;
 			}
 
-			if ((millis() - millis_last_grow) >= 1000)
+			if ((millis() - millis_last_fruit) >= 1000)
 			{
-				millis_last_grow = millis();
-				//Worm_Grow();
-				if(WormCurrentSpeed > 20)
-				{
-					WormCurrentSpeed -= 1;
-				}
+				millis_last_fruit = millis();
+				
+				Fruit_Service();
 			}
   
 			if ((millis() - millis_last_move) > WormCurrentSpeed)
