@@ -6,7 +6,7 @@ I HAVE KEPT THIS SIMPLE FOR A 10 YEAR OLD!
 
 ## Hardware 
 Adafruit M4 Metro
-Adafruit RGB display with their Library single 64x32 uni
+Adafruit RGB display with their Library single 64x32 unit
 4 Axis joystick using bounce2 lib
 
 ## Getting Started
@@ -23,6 +23,6 @@ Personally I am using Visual GDB plugin for heavy work - I find VGDB very good f
 Normally I try to import to Atmel Studio 7.0 but the SAMD51 arduino import is not working - maybe ask microchip/atmel about this... maybe MPLAB X involved?
 
 ### About
-move arround and eat pixels???
+move around and eat pixels???
 
 
