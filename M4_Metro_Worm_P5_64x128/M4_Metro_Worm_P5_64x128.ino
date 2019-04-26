@@ -128,13 +128,15 @@ void Worm_Reset()
 	}
 	
 	// draws a worm on the screen in a random location
-	// we keep the worm in the middle area all the same...
-	
-	int temp_x = (rand() % (matrix.width() / 2)) + matrix.width() / 4;
-	int temp_y = (rand() % (matrix.height() / 2)) + matrix.height() / 4;
+	// we keep the worm in the middle area all the same...	
+	int x_range = matrix.width() / 2;
+	int y_range = matrix.height() / 2;
+			
+	int temp_x = (rand() % x_range) + (x_range / 2);
+	int temp_y = (rand() % y_range) + (y_range / 2);
 	
 	WormBody[0].x = temp_x;
-	WormBody[0].x = temp_y;
+	WormBody[0].y = temp_y;
 	
 	WormLength++;   // first length of 1...
 	
