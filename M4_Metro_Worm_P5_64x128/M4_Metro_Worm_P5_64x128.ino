@@ -36,8 +36,7 @@ Worm_Directions WormDirection;
 int WormLength = 0;
 int WormCurrentSpeed = 300;
 
-#define WORM_MAX_LENGTH 2048
-
+#define WORM_MAX_LENGTH 1024
 
 typedef struct
 {
