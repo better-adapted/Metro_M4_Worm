@@ -34,7 +34,7 @@ enum Worm_Directions {Idle, Up, Down, Left, Right, stopped };
 
 Worm_Directions WormDirection;
 int WormLength = 0;
-int WormCurrentSpeed = 300;
+int WormCurrentSpeed = 300000; // 300 ms
 
 #define WORM_MAX_LENGTH 1024
 
@@ -86,15 +86,15 @@ void setup()
 	matrix.begin();
 
 	// fix the screen with red
-	matrix.fillRect(0, 0, matrix.width(), matrix.height(), matrix.Color333(7, 0, 0));
+	matrix.fillRect(0, 0, matrix.width(), matrix.height(), matrix.Color333(1, 0, 0));
 	delay(500);
 
 	// fix the screen with green
-	matrix.fillRect(0, 0, matrix.width(), matrix.height(), matrix.Color333(0, 7, 0));
+	matrix.fillRect(0, 0, matrix.width(), matrix.height(), matrix.Color333(0, 1, 0));
 	delay(500);
 
 	// fix the screen with blue
-	matrix.fillRect(0, 0, matrix.width(), matrix.height(), matrix.Color333(0, 0, 7));
+	matrix.fillRect(0, 0, matrix.width(), matrix.height(), matrix.Color333(0, 0, 1));
 	delay(500);
 
 	matrix.fillScreen(matrix.Color333(0, 0, 0));  // 0,0,0 = black
@@ -162,7 +162,7 @@ bool Fruit_New_Piece()
 					break;
 				}				
 			}
-			
+			break;			
 		}
 	}
 }
@@ -180,9 +180,9 @@ void Fruit_Service()
 	if (items < max_fruit_level)
 	{						
 		Fruit_New_Piece();
-	}
-	
+	}	
 }
+
 
 bool Worm_Check_Point_Inside(int x, int y)
 {
@@ -252,8 +252,9 @@ void Worm_Reset()
 	
 	WormLength++;   // first length of 1...
 	
+	Worm_Move();
 	Worm_Grow();
-	Worm_Grow();
+	Worm_Move();
 	Worm_Grow();
 		
 	Worm_Draw();
@@ -294,15 +295,15 @@ void Worm_Grow()
 
 	case Left:
 		{
-			new_x = WormBody[WormLength - 1].x;
-			new_y = WormBody[WormLength - 1].y - 1;
+			new_x = WormBody[WormLength - 1].x-1;
+			new_y = WormBody[WormLength - 1].y;
 		}
 		break;
 
 	case Right:
 		{
-			new_x = WormBody[WormLength - 1].x;
-			new_y = WormBody[WormLength - 1].y + 1;
+			new_x = WormBody[WormLength - 1].x+1;
+			new_y = WormBody[WormLength - 1].y;
 		}
 		break;
 	}
@@ -315,32 +316,39 @@ void Worm_Grow()
 
 void CheckDead()
 {
+	volatile int flags = 0;
+	
 	if (WormBody[0].y >= matrix.height())
 	{
-		WormDirection = stopped;
+		flags |= 0x0001;
 	}
 
 	if (WormBody[0].y < 0)
 	{
-		WormDirection = stopped;
+		flags |= 0x0002;
 	}
 
 	if (WormBody[0].x >= matrix.width())
 	{
-		WormDirection = stopped;
+		flags |= 0x0004;
 	}
 
 	if (WormBody[0].x < 0)
 	{
-		WormDirection = stopped;
+		flags |= 0x0008;
 	}
 
 	for (int index = 1; index < WormLength; index++)
 	{
 		if ((WormBody[0].x == WormBody[index].x) && (WormBody[0].y == WormBody[index].y))
 		{
-			WormDirection = stopped;
+			flags |= 0x0010;
 		}
+	}
+	
+	if (flags != 0)
+	{		
+		WormDirection = stopped;		
 	}
 }
 
@@ -386,8 +394,26 @@ void Worm_Move()
 		}
 		break;
 	}
+	
+	for (int index = 0; index < Fruit_Active(); index++)
+	{
+		if ((WormBody[0].x == FruitList[index].x)&&(WormBody[0].y == FruitList[index].y))
+		{
+			// head is eating fruit....!
+			FruitList[index].fruit = empty;
+			Worm_Grow();
+			
+			int rate = 20; // 20 = 2% increase in speed
+			
+			if (WormCurrentSpeed > 25000)
+			{
+				WormCurrentSpeed = (WormCurrentSpeed * 1000) / (1000 + rate) ;
+			}			
+			break;
+		}
+	}	
 
-	//CheckDead();
+	CheckDead();
 }
 
 void Worm_Draw()
@@ -454,7 +480,7 @@ void Worm_Draw()
 
 		case pear:
 			{
-				color = matrix.Color333(0, 7, 1);
+				color = matrix.Color333(0, 7, 1);				
 			}
 			break;
 
@@ -464,7 +490,11 @@ void Worm_Draw()
 			}
 			break;
 		}
-		matrix.writePixel(FruitList[index].x, FruitList[index].y, color);
+		
+		if (color > 0)
+		{
+			matrix.writePixel(FruitList[index].x, FruitList[index].y, color);			
+		}
 	}
 	
 
@@ -480,7 +510,7 @@ void Worm_Draw()
 		matrix.setCursor(8, 8);
 		matrix.println(temp);
      
-		sprintf(temp, "S:%d", WormCurrentSpeed);
+		sprintf(temp, "S:%d", WormCurrentSpeed/1000);
 		matrix.setCursor(8, 16);
 		matrix.println(temp);    
 	}
@@ -599,7 +629,7 @@ void loop()
 				Fruit_Service();
 			}
   
-			if ((millis() - millis_last_move) > WormCurrentSpeed)
+			if ((millis() - millis_last_move) > (WormCurrentSpeed/1000))
 			{
 				millis_last_move = millis();
 				Worm_Move();
