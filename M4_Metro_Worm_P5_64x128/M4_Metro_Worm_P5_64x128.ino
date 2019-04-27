@@ -30,11 +30,14 @@ Bounce RightButton;
 
 int milliseconds_debounce = 15;
 
-enum Worm_Directions {Idle, Up, Down, Left, Right, stopped };
+enum Worm_Status {Idle, Move_Up, Move_Down, Move_Left, Move_Right, Dead };
 
-Worm_Directions WormDirection;
+Worm_Status WormStatus;
 int WormLength = 0;
-int WormCurrentSpeed = 300000; // 300 ms
+int WormCurrentSpeed = 200000; // 200 ms
+
+int Fruit_Grow_Amount = 0;
+int Fruit_Speed_Amount = 0;
 
 #define WORM_MAX_LENGTH 1024
 
@@ -46,7 +49,7 @@ typedef struct
 
 static worm_segment WormBody[WORM_MAX_LENGTH];   // 100 parts to worm - as if!! [0] is his head and it fills up
 
-typedef enum {empty,apple,pear,orange}fruit_enum;
+typedef enum {empty,cherry,apple,bananna}fruit_enum;
 
 #define FRUIT_MAX 10
 typedef struct
@@ -54,7 +57,19 @@ typedef struct
 	int x;
 	int y;
 	
-	fruit_enum fruit;
+	fruit_enum state;
+	
+	long Created_Tick;
+	long Lifetime_ms;
+	
+	int GrowAmount;
+	int SpeedAmount;
+	
+	bool flash;
+	bool flash_state;
+	
+	int flash_counter;
+	
 }fruit_item;
 
 static fruit_item FruitList[FRUIT_MAX];    // 100 parts to worm - as if!! [0] is his head and it fills up
@@ -63,6 +78,7 @@ void Worm_Reset();
 void Worm_Draw();
 
 bool Worm_Check_Point_Inside(int x, int y);
+int Fruit_Service();
 
 void setup()
 {
@@ -107,7 +123,7 @@ int Fruit_Active()
 	// how may bits of fruit active
 	for(int index = 0 ; index < FRUIT_MAX ; index++)
 	{
-		if (FruitList[index].fruit != empty)
+		if (FruitList[index].state != empty)
 		{
 			counter++;
 		}
@@ -118,69 +134,157 @@ int Fruit_Active()
 
 bool Fruit_New_Piece()
 {	
-	bool done = false;
+	bool found_empty = false;
 	
-	for(int index = 0 ; index < FRUIT_MAX ; index++)
+	int index; // will be used further down..
+	
+	for (index = 0; index < FRUIT_MAX; index++)
 	{
-		if (FruitList[index].fruit == empty)
+		if (FruitList[index].state == empty)
 		{
-			int temp_random = (rand() % 3);
-			
-			switch (temp_random)
-			{				
-			case 0:
-				{
-					FruitList[index].fruit = apple;
-				}
-				break;
-
-			case 1:
-				{
-					FruitList[index].fruit = pear;					
-				}
-				break;
-
-			case 2:
-				{
-					FruitList[index].fruit = orange;
-				}
-				break;
-			}
-			
-			// make an new x,y location that is not inside the snake or within 1 pixel...
-			int temp_x, temp_y;
-			
-			while (1)
-			{
-				temp_x = rand() % matrix.width();
-				temp_y = rand() % matrix.height();
-			
-				if (Worm_Check_Point_Inside(temp_x, temp_y) == 0)
-				{
-					FruitList[index].x = temp_x;
-					FruitList[index].y = temp_y;
-					break;
-				}				
-			}
-			break;			
+			found_empty = true;
+			break; // stop looking
 		}
 	}
+	
+	if (!found_empty)
+	{
+		return false;
+	}
+	
+	// make an new x,y location that is not inside the snake or within 1 pixel...
+	int temp_x,temp_y;			
+	int random_trys = 100;
+	bool location_found = false;
+			
+	while ( (random_trys>0) && (!location_found) )
+	{
+		temp_x = rand() % matrix.width();
+		temp_y = rand() % matrix.height();
+		
+		if (Worm_Check_Point_Inside(temp_x, temp_y) == 0)
+		{
+			FruitList[index].x = temp_x;
+			FruitList[index].y = temp_y;
+					
+			location_found = true;										
+		}
+		
+		random_trys--;
+	}
+	
+	if (!location_found)
+	{
+		return false;
+	}
+	
+	// we need a random number 0 to 2 for 3 types for fruit
+	int temp_random = (rand() % 3);			
+	switch(temp_random)
+	{				
+	case 0:
+		{
+			FruitList[index].state = cherry;
+			FruitList[index].Lifetime_ms = 4000;
+			FruitList[index].GrowAmount = 1;
+			FruitList[index].SpeedAmount = 3;
+		}
+		break;
+
+	case 1:
+		{
+			FruitList[index].state = apple;					
+			FruitList[index].Lifetime_ms = 6000;
+			FruitList[index].GrowAmount = 2;
+			FruitList[index].SpeedAmount = 1;
+		}
+		break;
+
+	case 2:
+		{
+			FruitList[index].state = bananna;
+			FruitList[index].Lifetime_ms = 8000;
+			FruitList[index].GrowAmount = 1;
+			FruitList[index].SpeedAmount = 1;
+		}
+		break;
+	}
+	
+	// now the times for this fruit
+	FruitList[index].Created_Tick = millis();
+	FruitList[index].flash = false;
+	FruitList[index].flash_state = true;
+	FruitList[index].flash_counter = 0;
+				
+	return true;
 }
 
 
-void Fruit_Service()
+int Fruit_Service()
 {
+	int updates = 0;
+	
 	// every time a peice is eaten a new peice will spawn random 0 to 3 seconds later...
 	
 	// need fruit?
 	int items = Fruit_Active();
 	
-	int max_fruit_level = 5;
+	int max_fruit_level = 1;
 	
 	if (items < max_fruit_level)
 	{						
 		Fruit_New_Piece();
+		updates++;
+	}
+	
+	volatile int index;
+	
+	for (index = 0; index < FRUIT_MAX; index++)
+	{
+		if (FruitList[index].state != empty)
+		{
+			volatile long age_ms = millis() - FruitList[index].Created_Tick;
+			
+			volatile long ms_left = FruitList[index].Lifetime_ms - age_ms;
+			
+			if(ms_left <= 0)
+			{
+				FruitList[index].state = empty;
+				updates++;								
+			}
+			else if (ms_left < 2000)
+			{
+				FruitList[index].flash_state = true;
+				
+				FruitList[index].flash_counter++;
+				FruitList[index].flash_counter %= 4;
+
+				if (FruitList[index].flash_counter < 2)
+				{
+					FruitList[index].flash_state = false;
+				}
+				else
+				{
+				    FruitList[index].flash_state = true;
+				}				
+			}						
+			else if (ms_left < 4000)
+			{
+				FruitList[index].flash_counter++;
+				FruitList[index].flash_counter %= 6;
+				
+				if (FruitList[index].flash_counter < 1)
+				{
+					FruitList[index].flash_state = false;
+				}
+				else
+				{
+					FruitList[index].flash_state = true;
+				}				
+			}						
+		}
 	}	
+	return updates;
 }
 
 
@@ -195,6 +299,18 @@ bool Worm_Check_Point_Inside(int x, int y)
 			count++;			
 		}
 	}	
+
+	for (int index = 0; index < FRUIT_MAX; index++)
+	{
+		if (FruitList[index].state != empty)
+		{
+			if ((FruitList[index].x == x)&&(FruitList[index].y == y))
+			{
+				count++;
+			}			
+		}
+	}	
+	
 	return count;
 }
 
@@ -216,25 +332,25 @@ void Worm_Reset()
 	{
 	case 0:
 		{
-			WormDirection = Up;
+			WormStatus = Move_Up;
 		}
 		break;
 		
 	case 1:
 		{
-			WormDirection = Down;
+			WormStatus = Move_Down;
 		}
 		break;
 
 	case 2:
 		{
-			WormDirection = Left;			
+			WormStatus = Move_Left;			
 		}
 		break;
 
 	case 3:
 		{
-			WormDirection = Right;			
+			WormStatus = Move_Right;			
 		}
 		break;
 	}
@@ -265,7 +381,7 @@ void Worm_Grow()
 	int new_x = 0;
 	int new_y = 0;
 
-	switch (WormDirection)
+	switch (WormStatus)
 	{
 	case Idle:
 		{
@@ -273,34 +389,34 @@ void Worm_Grow()
 		}
 		break;
 		
-	case stopped:
+	case Dead:
 		{
 				
 		}
 		break;
 
-	case Up:
+	case Move_Up:
 		{
 			new_x = WormBody[WormLength - 1].x;
 			new_y = WormBody[WormLength - 1].y - 1;
 		}
 		break;
 
-	case Down:
+	case Move_Down:
 		{
 			new_x = WormBody[WormLength - 1].x;
 			new_y = WormBody[WormLength - 1].y + 1;
 		}
 		break;
 
-	case Left:
+	case Move_Left:
 		{
 			new_x = WormBody[WormLength - 1].x-1;
 			new_y = WormBody[WormLength - 1].y;
 		}
 		break;
 
-	case Right:
+	case Move_Right:
 		{
 			new_x = WormBody[WormLength - 1].x+1;
 			new_y = WormBody[WormLength - 1].y;
@@ -314,7 +430,7 @@ void Worm_Grow()
 	WormLength++;
 }
 
-void CheckDead()
+void Worm_Check_Dead()
 {
 	volatile int flags = 0;
 	
@@ -348,13 +464,13 @@ void CheckDead()
 	
 	if (flags != 0)
 	{		
-		WormDirection = stopped;		
+		WormStatus = Dead;		
 	}
 }
 
 void Worm_Move()
 {
-	if (WormDirection == stopped)
+	if (WormStatus == Dead)
 	{
 		return;
 	}
@@ -368,52 +484,57 @@ void Worm_Move()
 		index--;
 	}
 
-	switch (WormDirection)
+	switch (WormStatus)
 	{
-	case Up:
+	case Move_Up:
 		{
 			WormBody[0].y--;
 		}
 		break;
 
-	case Down:
+	case Move_Down:
 		{
 			WormBody[0].y++;
 		}
 		break;
 
-	case Left:
+	case Move_Left:
 		{
 			WormBody[0].x--;
 		}
 		break;
 
-	case Right:
+	case Move_Right:
 		{
 			WormBody[0].x++;
 		}
 		break;
+		
+	default:
+		{
+			
+		}
+		break;
 	}
 	
-	for (int index = 0; index < Fruit_Active(); index++)
+	// now check if we are eating fruit....
+	// go through all the list as elements are not organised neatly - need to check them all
+	for (int index = 0; index < FRUIT_MAX; index++)
 	{
-		if ((WormBody[0].x == FruitList[index].x)&&(WormBody[0].y == FruitList[index].y))
+		if (FruitList[index].state != empty)
 		{
-			// head is eating fruit....!
-			FruitList[index].fruit = empty;
-			Worm_Grow();
-			
-			int rate = 20; // 20 = 2% increase in speed
-			
-			if (WormCurrentSpeed > 25000)
+			// fruit in this list element...			
+			if ((WormBody[0].x == FruitList[index].x)&&(WormBody[0].y == FruitList[index].y))
 			{
-				WormCurrentSpeed = (WormCurrentSpeed * 1000) / (1000 + rate) ;
+				// get what it was worth
+				Fruit_Grow_Amount += FruitList[index].GrowAmount;
+				Fruit_Speed_Amount += FruitList[index].SpeedAmount;
+								
+				// this fruit is now gone..
+				FruitList[index].state = empty;							
 			}			
-			break;
 		}
 	}	
-
-	CheckDead();
 }
 
 void Worm_Draw()
@@ -422,7 +543,7 @@ void Worm_Draw()
 
 	for (int index = 0; index < WormLength; index++)
 	{
-		if (WormDirection == stopped)
+		if (WormStatus == Dead)
 		{
 			matrix.writePixel(WormBody[index].x, WormBody[index].y, matrix.Color333(1, 1, 1));
 		}
@@ -461,24 +582,26 @@ void Worm_Draw()
 		}						
 	}  
 	
-	for (int index = 0; index < Fruit_Active(); index++)
+	volatile int index;
+	
+	for (index = 0; index < FRUIT_MAX ;index++)
 	{
 		uint16_t color=0;
-		switch (FruitList[index].fruit)
+		switch (FruitList[index].state)
 		{
-		case apple:
+		case cherry:
 			{
 				color = matrix.Color333(7, 0, 0);
 			}
 			break;
 			
-		case orange:
+		case bananna:
 			{
 				color = matrix.Color333(7, 4, 0);
 			}
 			break;
 
-		case pear:
+		case apple:
 			{
 				color = matrix.Color333(0, 7, 1);				
 			}
@@ -491,14 +614,24 @@ void Worm_Draw()
 			break;
 		}
 		
-		if (color > 0)
+		if (FruitList[index].state!=empty)
 		{
-			matrix.writePixel(FruitList[index].x, FruitList[index].y, color);			
+			if (FruitList[index].flash)
+			{
+				if (FruitList[index].flash_state)
+				{
+					matrix.writePixel(FruitList[index].x, FruitList[index].y, color);					
+				}
+			}
+			else
+			{
+				matrix.writePixel(FruitList[index].x, FruitList[index].y, color);				
+			}
 		}
 	}
 	
 
-	if (WormDirection == stopped)
+	if (WormStatus == Dead)
 	{
 		matrix.setTextSize(1);      // size 1 == 8 pixels high
 		matrix.setTextWrap(false);  // Don't wrap at end of line - will do ourselves
@@ -527,10 +660,10 @@ bool Poll_Joystick()
 		{
 			// gone low to high - pressed
             
-			if((WormDirection != Up)&&(WormDirection != Down))
+			if((WormStatus != Move_Up)&&(WormStatus != Move_Down))
 			{
 				Update = true;
-				WormDirection = Up;
+				WormStatus = Move_Up;
 				Serial.println("Up");
 			}
 		}
@@ -541,11 +674,11 @@ bool Poll_Joystick()
 		// somethings hase changed - falling or rising?
 		if(DownButton.rose())
 		{
-			if ((WormDirection != Down)&&(WormDirection != Up))
+			if ((WormStatus != Move_Down)&&(WormStatus != Move_Up))
 			{
 				// gone low to high - pressed
 				Update = true;
-				WormDirection = Down;
+				WormStatus = Move_Down;
 				Serial.println("Down");
 			}
 		}
@@ -556,11 +689,11 @@ bool Poll_Joystick()
 		// somethings hase changed - falling or rising?
 		if(LeftButton.rose())
 		{
-			if ((WormDirection != Left)&&(WormDirection != Right))
+			if ((WormStatus != Move_Left)&&(WormStatus != Move_Right))
 			{
 				// gone low to high - pressed
 				Update = true;
-				WormDirection = Left;
+				WormStatus = Move_Left;
 				Serial.println("Left");
 			}
 		}
@@ -571,11 +704,11 @@ bool Poll_Joystick()
 		// somethings hase changed - falling or rising?
 		if(RightButton.rose())
 		{
-			if ((WormDirection != Right)&&(WormDirection != Left))
+			if ((WormStatus != Move_Right)&&(WormStatus != Move_Left))
 			{
 				// gone low to high - pressed
 				Update = true;
-				WormDirection = Right;
+				WormStatus = Move_Right;
 				Serial.println("Right");
 			}
 		}
@@ -597,55 +730,102 @@ void debug_keys()
 	Serial.println();
 }
 
+bool Worm_Speed_Up()
+{
+	int rate = 50;    // 50 = 5% increase in speed			
+	if(WormCurrentSpeed > 25000)
+	{
+		WormCurrentSpeed = (WormCurrentSpeed * 1000) / (1000 + rate);				
+		return true;
+	}	
+	else
+	{
+		return false;
+	}
+}
+
 static long millis_last_move;
 static long millis_last_fruit;
-bool WaitForMove = false;
-bool DrawDead = false;
+bool DrawGameOver = false;
+
+int DrawFlags = 0; // we or this value if a draw is needed - like worm direction change or new peice of fruit or dead...
 
 void loop()
 {
-	if (WormDirection == Idle)
+	if (WormStatus == Idle)
 	{
+		// waiting for start
 		if (Poll_Joystick())
 		{
 			// button changed
+			srand(millis()); // helps randomess
 			Worm_Reset();				
+			DrawFlags |= 0x0001;
+		}
+	}
+	else if (WormStatus == Dead)
+	{
+		// worm is dead...
+		if (DrawGameOver == 0)
+		{
+			DrawGameOver = true;
+			DrawFlags |= 0x0002;
 		}
 	}
 	else
 	{
-		if (WormDirection != stopped)
+		// worm should be alive and moving....up down left or right
+		if (Poll_Joystick())
 		{
-			if (Poll_Joystick())
+			srand(millis());  // helps randomess
+
+			// returns true if there has been an update.. like direction change
+			DrawFlags |= 0x0004;
+		}
+
+		// keep drawing fruit every 1000ms
+		if ((millis() - millis_last_fruit) >= 100)
+		{
+			millis_last_fruit = millis();
+				
+			Fruit_Service();
+			
+			DrawFlags |= 0x0008;
+		}
+  
+		// do we need to move - based on speed setting?
+		if ((millis() - millis_last_move) > (WormCurrentSpeed/1000))
+		{
+			millis_last_move = millis();
+			
+			// lot going on in move function
+			Worm_Move();
+			
+			// did we get fruit...?
+			
+			// if so adjust things
+			if (Fruit_Grow_Amount > 0)
 			{
-				Worm_Draw();
-				WaitForMove = true;
+				Worm_Grow();
+				Fruit_Grow_Amount--;
+			}
+			
+			if (Fruit_Speed_Amount > 0)
+			{
+				Worm_Speed_Up();
+				Fruit_Speed_Amount--;
 			}
 
-			if ((millis() - millis_last_fruit) >= 1000)
-			{
-				millis_last_fruit = millis();
-				
-				Fruit_Service();
-			}
-  
-			if ((millis() - millis_last_move) > (WormCurrentSpeed/1000))
-			{
-				millis_last_move = millis();
-				Worm_Move();
-				Worm_Draw();
-				WaitForMove = false;    
-			}
+			Worm_Check_Dead();
+			DrawFlags |= 0x0010;
 		}
-		else
-		{
-			if (DrawDead == 0)
-			{
-				Worm_Draw();
-				DrawDead = true;
-			}
-		}				
 	}
 
 	rand();  // keep making random numbers...
+	
+	if(DrawFlags)
+	{
+		Worm_Draw();
+		DrawFlags = 0;
+	}
 }
